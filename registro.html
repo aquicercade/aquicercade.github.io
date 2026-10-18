@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registra tu negocio · Aquí cerca</title>
+<style>
+:root{--bg:#f3f8f7;--card:#fff;--ink:#14262b;--mut:#587077;--brand:#0e5a64;--sun:#f2b705;--line:#cfdcdd;--err:#b3261e;--ok:#17653a}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1b1e;--card:#162a2e;--ink:#e8f1f1;--mut:#9db5b9;--brand:#5fc3cf;--sun:#f2b705;--line:#2c474c;--err:#ff8a80;--ok:#7fd9a0}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--brand);color:#fff;padding:28px 20px 34px;border-bottom:6px solid var(--sun)}
+header h1{margin:0 0 6px;font-size:1.7rem;line-height:1.2}
+header p{margin:0;max-width:34em;opacity:.95}
+main{max-width:620px;margin:0 auto;padding:20px 16px 48px}
+form{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+label{display:block;font-weight:600;margin:18px 0 6px}
+label:first-of-type{margin-top:0}
+.hint{font-weight:400;color:var(--mut);font-size:.9rem}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:8px;padding:11px 12px}
+textarea{min-height:110px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:3px solid var(--sun);outline-offset:1px;border-color:var(--brand)}
+.check{display:flex;gap:10px;align-items:center;font-weight:600;margin-top:18px}
+.check input{width:22px;height:22px;accent-color:var(--brand)}
+.extra{display:none}.extra.on{display:block}
+.hp{position:absolute;left:-9999px;height:0;overflow:hidden}
+button{margin-top:24px;width:100%;font:inherit;font-weight:700;background:var(--sun);color:#14262b;border:0;border-radius:10px;padding:14px;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+#msg{margin-top:16px;font-weight:600}
+#msg.err{color:var(--err)}#msg.ok{color:var(--ok)}
+footer{text-align:center;color:var(--mut);font-size:.88rem;margin-top:18px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Registra tu negocio en Aquí cerca</h1>
+  <p>Tus vecinos te encuentran por colonia: qué vendes, dónde estás y cómo contactarte. Es gratis y toma dos minutos.</p>
+</header>
+<main>
+<form id="f" novalidate>
+  <label for="nombre">Nombre del negocio</label>
+  <input id="nombre" name="nombre" maxlength="99" required autocomplete="organization">
+
+  <label for="colonia">Colonia</label>
+  <input id="colonia" name="colonia" list="colonias" maxlength="80" required placeholder="Ej. Santa Fe">
+  <datalist id="colonias"><option value="Santa Fe"><option value="Colonia Olímpica"><option value="Villa Galaxia"></datalist>
+
+  <label for="categoria">Tipo de negocio <span class="hint">(lo que ofreces)</span></label>
+  <input id="categoria" name="categoria" list="categorias" maxlength="80" required placeholder="Ej. Tortillería, mecánico, abarrotes">
+  <datalist id="categorias"><option value="Tortillería"><option value="Abarrotes"><option value="Mecánico"><option value="Electricista"><option value="Plomero"><option value="Comida preparada"><option value="Papelería"><option value="Estética"></datalist>
+
+  <label for="descripcion">Describe tu negocio <span class="hint">(productos o servicios)</span></label>
+  <textarea id="descripcion" name="descripcion" maxlength="600" required></textarea>
+
+  <label for="direccion">Dirección o calle</label>
+  <input id="direccion" name="direccion" maxlength="160" autocomplete="street-address">
+
+  <label for="maps">Enlace de Google Maps <span class="hint">(opcional)</span></label>
+  <input id="maps" name="maps" type="url" maxlength="300" placeholder="https://maps.app.goo.gl/…">
+
+  <label for="telefono">WhatsApp o teléfono</label>
+  <input id="telefono" name="telefono" type="tel" maxlength="20" inputmode="tel" required autocomplete="tel">
+
+  <label for="horario">Horario <span class="hint">(opcional)</span></label>
+  <input id="horario" name="horario" maxlength="120" placeholder="Ej. Lunes a sábado, 7 am a 3 pm">
+
+  <label class="check"><input id="domicilio" name="domicilio" type="checkbox"> Hago entregas a domicilio</label>
+
+  <label class="check"><input id="pagina" name="pagina" type="checkbox"> Me interesa tener mi propia página en Aquí cerca</label>
+  <div id="extra" class="extra">
+    <label for="detalle">¿Qué te gustaría mostrar? <span class="hint">(fotos, catálogo, menú, promociones…)</span></label>
+    <textarea id="detalle" name="detalle" maxlength="500"></textarea>
+  </div>
+
+  <div class="hp" aria-hidden="true"><label>No llenar<input id="web" name="web" tabindex="-1" autocomplete="off"></label></div>
+
+  <button id="btn" type="submit">Enviar mi negocio</button>
+  <div id="msg" role="status" aria-live="polite"></div>
+</form>
+<footer>Revisamos cada registro antes de publicarlo.</footer>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyCj0lk6icUtUNFmTUIjFQ57ilA3YGGN7oY",
+  authDomain: "aqui-cerca-f6597.firebaseapp.com",
+  projectId: "aqui-cerca-f6597",
+  storageBucket: "aqui-cerca-f6597.firebasestorage.app",
+  messagingSenderId: "890764353634",
+  appId: "1:890764353634:web:7c824f65d18348dbf0713b"
+});
+const db = getFirestore(app);
+
+const f = document.getElementById("f"), btn = document.getElementById("btn"), msg = document.getElementById("msg");
+const say = (t, c) => { msg.textContent = t; msg.className = c || ""; };
+const v = id => document.getElementById(id).value.trim();
+const extra = document.getElementById("extra");
+document.getElementById("pagina").addEventListener("change", e => extra.classList.toggle("on", e.target.checked));
+
+f.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (v("web")) return;
+  const req = ["nombre","colonia","categoria","descripcion","telefono"];
+  if (req.some(id => !v(id))) { say("Completa los campos obligatorios: nombre, colonia, tipo, descripción y teléfono.", "err"); return; }
+  const maps = v("maps");
+  if (maps && !/^https?:\/\//i.test(maps)) { say("El enlace de Google Maps debe empezar con https://", "err"); return; }
+  btn.disabled = true; say("Enviando…");
+  try {
+    await addDoc(collection(db, "negocios"), {
+      nombre: v("nombre"), colonia: v("colonia"), categoria: v("categoria"),
+      descripcion: v("descripcion"), direccion: v("direccion"), maps,
+      telefono: v("telefono"), horario: v("horario"),
+      domicilio: document.getElementById("domicilio").checked,
+      quierePagina: document.getElementById("pagina").checked,
+      detallePagina: v("detalle"),
+      estado: "pendiente", creado: serverTimestamp()
+    });
+    f.reset(); extra.classList.remove("on"); say("¡Listo! Recibimos tu negocio. Lo revisaremos y lo publicaremos pronto.", "ok");
+  } catch (err) {
+    console.error(err);
+    say("No pudimos enviar tu registro. Revisa tu conexión e inténtalo de nuevo.", "err");
+  }
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
