@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aquí cerca · Negocios de tu colonia</title>
+<style>
+:root{--bg:#f3f8f7;--card:#fff;--ink:#14262b;--mut:#587077;--brand:#0e5a64;--sun:#f2b705;--line:#cfdcdd}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1b1e;--card:#162a2e;--ink:#e8f1f1;--mut:#9db5b9;--brand:#5fc3cf;--line:#2c474c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:#0e5a64;color:#fff;padding:26px 20px 30px;border-bottom:6px solid var(--sun)}
+header .t{font-size:.95rem;letter-spacing:.08em;text-transform:uppercase;opacity:.85;margin:0 0 4px}
+header h1{margin:0;font-size:1.7rem;line-height:1.2}
+main{max-width:680px;margin:0 auto;padding:18px 16px 48px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px}
+.chip{flex:none;font:inherit;font-size:.95rem;background:var(--card);color:var(--ink);border:1.5px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
+.chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+@media (prefers-color-scheme:dark){.chip.on{color:#0e1b1e}}
+input[type=search]{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:16px}
+input:focus,.chip:focus-visible,a:focus-visible{outline:3px solid var(--sun);outline-offset:1px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.card h2{margin:0 0 2px;font-size:1.2rem}
+.cat{color:var(--brand);font-weight:600;font-size:.92rem}
+.card p{margin:10px 0 0}
+.meta{color:var(--mut);font-size:.93rem;margin-top:8px}
+.badge{display:inline-block;background:var(--sun);color:#14262b;font-weight:700;font-size:.8rem;border-radius:6px;padding:2px 8px;margin-top:10px}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.btns a{text-decoration:none;font-weight:700;border-radius:9px;padding:10px 14px;font-size:.95rem}
+.wa{background:#1f9d55;color:#fff}.call{background:var(--brand);color:#fff}.map{border:1.5px solid var(--brand);color:var(--brand)}
+@media (prefers-color-scheme:dark){.call{color:#0e1b1e}.map{color:var(--brand)}}
+.state{text-align:center;color:var(--mut);padding:30px 10px}
+.state a{color:var(--brand);font-weight:700}
+footer{text-align:center;margin-top:10px}
+footer a{color:var(--brand);font-weight:700}
+</style>
+</head>
+<body>
+<header>
+  <p class="t">Aquí cerca</p>
+  <h1 id="titulo">Negocios cerca de ti</h1>
+</header>
+<main>
+  <div id="chips" class="chips" aria-label="Colonias"></div>
+  <input id="q" type="search" placeholder="Buscar por nombre o tipo de negocio" aria-label="Buscar">
+  <div id="lista"><div class="state">Cargando negocios…</div></div>
+  <footer><a href="registro.html">¿Tienes un negocio? Regístralo gratis</a></footer>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyCj0lk6icUtUNFmTUIjFQ57ilA3YGGN7oY",
+  authDomain: "aqui-cerca-f6597.firebaseapp.com",
+  projectId: "aqui-cerca-f6597",
+  storageBucket: "aqui-cerca-f6597.firebasestorage.app",
+  messagingSenderId: "890764353634",
+  appId: "1:890764353634:web:7c824f65d18348dbf0713b"
+});
+const db = getFirestore(app);
+
+const norm = s => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/^(colonia|col\.?)\s+/, "").trim();
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
+
+const $lista = document.getElementById("lista"), $chips = document.getElementById("chips"),
+      $q = document.getElementById("q"), $t = document.getElementById("titulo");
+let negocios = [], colonias = new Map(), sel = norm(new URLSearchParams(location.search).get("c"));
+
+function link(cls, href, text) { const a = el("a", cls, text); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; return a; }
+
+function card(n) {
+  const c = el("div", "card");
+  c.append(el("h2", "", n.nombre), el("div", "cat", n.categoria || ""));
+  if (n.descripcion) c.append(el("p", "", n.descripcion));
+  if (n.direccion) c.append(el("div", "meta", "📍 " + n.direccion));
+  if (n.horario) c.append(el("div", "meta", "🕒 " + n.horario));
+  if (n.domicilio) c.append(el("span", "badge", "Entrega a domicilio"));
+  const d = String(n.telefono || "").replace(/\D/g, "");
+  const b = el("div", "btns");
+  if (d.length >= 10) {
+    b.append(link("wa", "https://wa.me/" + (d.length === 10 ? "52" + d : d), "WhatsApp"));
+    b.append(link("call", "tel:" + d, "Llamar"));
+  }
+  if (/^https:\/\//i.test(n.maps || "")) b.append(link("map", n.maps, "Cómo llegar"));
+  if (b.children.length) c.append(b);
+  return c;
+}
+
+function renderChips() {
+  $chips.replaceChildren();
+  const mk = (slug, name) => {
+    const x = el("button", "chip" + (sel === slug ? " on" : ""), name);
+    x.type = "button";
+    x.onclick = () => { sel = slug; history.replaceState(null, "", slug ? "?c=" + encodeURIComponent(slug) : location.pathname); render(); };
+    $chips.append(x);
+  };
+  mk("", "Todas");
+  [...colonias].sort((a, b) => a[1].localeCompare(b[1], "es")).forEach(([s, n]) => mk(s, n));
+}
+
+function render() {
+  renderChips();
+  $t.textContent = sel && colonias.has(sel) ? "Aquí cerca de " + colonias.get(sel) : "Negocios cerca de ti";
+  const q = norm($q.value);
+  const items = negocios
+    .filter(n => !sel || norm(n.colonia) === sel)
+    .filter(n => !q || norm(n.nombre + " " + n.categoria + " " + n.descripcion).includes(q))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  $lista.replaceChildren();
+  if (!items.length) {
+    const s = el("div", "state", negocios.length ? "No encontramos negocios con esa búsqueda. " : "Aún no hay negocios publicados en esta colonia. ");
+    const a = el("a", "", "Registra el tuyo"); a.href = "registro.html"; s.append(a);
+    $lista.append(s); return;
+  }
+  items.forEach(n => $lista.append(card(n)));
+}
+
+$q.addEventListener("input", render);
+
+try {
+  const snap = await getDocs(query(collection(db, "negocios"), where("estado", "==", "aprobado")));
+  negocios = snap.docs.map(d => d.data()).filter(n => n.nombre && n.colonia);
+  negocios.forEach(n => { const s = norm(n.colonia); if (!colonias.has(s)) colonias.set(s, n.colonia.replace(/^(colonia|col\.?)\s+/i, "")); });
+  render();
+} catch (err) {
+  console.error(err);
+  $lista.replaceChildren(el("div", "state", "No pudimos cargar los negocios. Revisa tu conexión e inténtalo de nuevo."));
+}
+</script>
+</body>
+</html>
