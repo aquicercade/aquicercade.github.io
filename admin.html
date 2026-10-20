@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin · Aquí cerca</title>
+<style>
+:root{--bg:#f3f8f7;--card:#fff;--ink:#14262b;--mut:#587077;--brand:#0e5a64;--sun:#f2b705;--line:#cfdcdd;--red:#c62828;--green:#1f8a4c}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1b1e;--card:#162a2e;--ink:#e8f1f1;--mut:#9db5b9;--brand:#5fc3cf;--line:#2c474c;--red:#e04b4b;--green:#2ea35f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:#0e5a64;color:#fff;padding:20px;border-bottom:6px solid var(--sun);display:flex;justify-content:space-between;align-items:center;gap:10px}
+header h1{margin:0;font-size:1.3rem}
+header button{font:inherit;font-size:.9rem;background:transparent;color:#fff;border:1.5px solid #fff;border-radius:8px;padding:6px 12px;cursor:pointer}
+main{max-width:680px;margin:0 auto;padding:16px}
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.tab{font:inherit;font-size:.95rem;background:var(--card);color:var(--ink);border:1.5px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
+.tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+@media (prefers-color-scheme:dark){.tab.on{color:#0e1b1e}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.card h2{margin:0;font-size:1.15rem}
+.cat{color:var(--brand);font-weight:600;font-size:.92rem}
+.row{color:var(--mut);font-size:.93rem;margin-top:6px;word-break:break-word}
+.desc{margin:10px 0 0}
+.want{display:inline-block;background:var(--sun);color:#14262b;font-weight:700;font-size:.8rem;border-radius:6px;padding:2px 8px;margin-top:10px}
+.acts{display:flex;gap:10px;margin-top:14px}
+.st{flex:1;font:inherit;font-weight:700;color:#fff;border:0;border-radius:10px;padding:12px;cursor:pointer}
+.st.p{background:var(--red)}.st.a{background:var(--green)}
+.del{font:inherit;background:transparent;color:var(--red);border:1.5px solid var(--red);border-radius:10px;padding:12px 14px;cursor:pointer}
+button:disabled{opacity:.6}
+button:focus-visible{outline:3px solid var(--sun);outline-offset:1px}
+.state{text-align:center;color:var(--mut);padding:30px 10px}
+.login{text-align:center;padding:40px 10px}
+.login button{font:inherit;font-weight:700;background:var(--sun);color:#14262b;border:0;border-radius:10px;padding:14px 22px;cursor:pointer}
+#err{color:var(--red);font-weight:600;text-align:center;margin-top:12px}
+</style>
+</head>
+<body>
+<header><h1>Admin · Aquí cerca</h1><button id="out" hidden>Salir</button></header>
+<main>
+  <div id="login" class="login">
+    <p>Acceso solo para el administrador.</p>
+    <button id="in">Entrar con Google</button>
+  </div>
+  <div id="panel" hidden>
+    <div class="tabs" id="tabs"></div>
+    <div id="lista"><div class="state">Cargando…</div></div>
+  </div>
+  <div id="err" role="status"></div>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
+
+const ADMIN = "aquicercade@gmail.com";
+const app = initializeApp({
+  apiKey: "AIzaSyCj0lk6icUtUNFmTUIjFQ57ilA3YGGN7oY",
+  authDomain: "aqui-cerca-f6597.firebaseapp.com",
+  projectId: "aqui-cerca-f6597",
+  storageBucket: "aqui-cerca-f6597.firebasestorage.app",
+  messagingSenderId: "890764353634",
+  appId: "1:890764353634:web:7c824f65d18348dbf0713b"
+});
+const auth = getAuth(app), db = getFirestore(app);
+
+const $ = id => document.getElementById(id);
+const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x) e.textContent = x; return e; };
+const say = t => { $("err").textContent = t || ""; };
+
+let items = [], filtro = "pendiente";
+
+$("in").onclick = async () => {
+  say("");
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) { console.error(e); say("No se pudo iniciar sesión. Inténtalo de nuevo."); }
+};
+$("out").onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async u => {
+  const ok = u && u.email === ADMIN;
+  if (u && !ok) { say("Esta cuenta no tiene acceso."); await signOut(auth); return; }
+  $("login").hidden = !!ok; $("panel").hidden = !ok; $("out").hidden = !ok;
+  if (ok) { say(""); load(); }
+});
+
+async function load() {
+  $("lista").replaceChildren(el("div", "state", "Cargando…"));
+  try {
+    const snap = await getDocs(collection(db, "negocios"));
+    items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.creado?.seconds || 0) - (a.creado?.seconds || 0));
+    render();
+  } catch (e) {
+    console.error(e);
+    $("lista").replaceChildren(el("div", "state", "No se pudo cargar. Revisa las reglas de Firestore."));
+  }
+}
+
+function renderTabs() {
+  const n = e => items.filter(i => i.estado === e).length;
+  const defs = [["pendiente", "Pendientes (" + n("pendiente") + ")"], ["aprobado", "Aprobados (" + n("aprobado") + ")"], ["todos", "Todos (" + items.length + ")"]];
+  $("tabs").replaceChildren(...defs.map(([k, t]) => {
+    const b = el("button", "tab" + (filtro === k ? " on" : ""), t);
+    b.type = "button"; b.onclick = () => { filtro = k; render(); };
+    return b;
+  }));
+}
+
+function card(n) {
+  const c = el("div", "card");
+  c.append(el("h2", "", n.nombre), el("div", "cat", [n.categoria, n.colonia].filter(Boolean).join(" · ")));
+  if (n.descripcion) c.append(el("p", "desc", n.descripcion));
+  [["📍", n.direccion], ["📞", n.telefono], ["🕒", n.horario], ["🗺️", n.maps]].forEach(([i, v]) => { if (v) c.append(el("div", "row", i + " " + v)); });
+  if (n.domicilio) c.append(el("div", "row", "🛵 Entrega a domicilio"));
+  if (n.quierePagina) c.append(el("span", "want", "Quiere página propia" + (n.detallePagina ? ": " + n.detallePagina : "")));
+  const a = el("div", "acts");
+  const aprobado = n.estado === "aprobado";
+  const st = el("button", "st " + (aprobado ? "a" : "p"), aprobado ? "Aprobado ✓" : "Pendiente · tocar para aprobar");
+  st.type = "button";
+  st.onclick = async () => {
+    st.disabled = true; say("");
+    const nuevo = aprobado ? "pendiente" : "aprobado";
+    try { await updateDoc(doc(db, "negocios", n.id), { estado: nuevo }); n.estado = nuevo; render(); }
+    catch (e) { console.error(e); say("No se pudo guardar el cambio."); st.disabled = false; }
+  };
+  const d = el("button", "del", "Eliminar"); d.type = "button";
+  d.onclick = async () => {
+    if (!confirm("¿Eliminar \"" + n.nombre + "\"? No se puede deshacer.")) return;
+    try { await deleteDoc(doc(db, "negocios", n.id)); items = items.filter(i => i.id !== n.id); render(); }
+    catch (e) { console.error(e); say("No se pudo eliminar."); }
+  };
+  a.append(st, d); c.append(a);
+  return c;
+}
+
+function render() {
+  renderTabs();
+  const list = items.filter(i => filtro === "todos" || i.estado === filtro);
+  $("lista").replaceChildren(...(list.length ? list.map(card) : [el("div", "state", "No hay negocios en esta lista.")]));
+}
+</script>
+</body>
+</html>
