@@ -75,7 +75,7 @@ let items = [], filtro = "pendiente";
 $("in").onclick = async () => {
   say("");
   try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-  catch (e) { console.error(e); say("No se pudo iniciar sesión. Inténtalo de nuevo."); }
+  catch (e) { console.error(e); say("No se pudo iniciar sesión (" + (e.code || "error") + "). Inténtalo de nuevo."); }
 };
 $("out").onclick = () => signOut(auth);
 
